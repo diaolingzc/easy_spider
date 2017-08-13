@@ -2,6 +2,7 @@ import os
 
 __author__ = 'Gallon'
 # coding:utf-8
+# www.mzitu.com/all/
 
 from mzitu_spider import html_downloader
 from mzitu_spider import html_outputer
@@ -24,8 +25,8 @@ class SpiderMain(object):
         count = 1
         html_cont = self.downloader.download(root_url)
         res_data = self.parser.parse_all(root_url, html_cont, self.downloader)
-        for data in res_data:
-            self.urls.add_new_urls(new_urls)
+        # for data in res_data:
+        #     self.urls.add_new_urls(new_urls)
 
         while self.urls.has_new_url():
             # try:
