@@ -1,13 +1,19 @@
 # coding:utf8
 from urllib.parse import urlencode
 import requests
+from lxml.etree import XMLSyntaxError
 from pyquery import PyQuery as pq
+import pymongo
 
+from WeixinArticles.config import *
+
+client = pymongo.MongoClient('localhost')
+db = client[MONGO_DB]
 
 base_url = 'http://weixin.sogou.com/weixin?'
 
 headers = {
-    'Cookie': 'SUV=00BC555A72DDB1345A115E787464E355; SUID=28BFDD722313940A000000005A365C69; usid=DTANBAfUu85LGdi9; IPLOC=CN3201; ABTEST=0|1516520682|v1; weixinIndexVisited=1; sct=1; SNUID=D3A8CA64171275536A549C2917886DF4; JSESSIONID=aaaZJtJlya0R3dxQD8ddw; ppinf=5|1516520800|1517730400|dHJ1c3Q6MToxfGNsaWVudGlkOjQ6MjAxN3x1bmlxbmFtZToxODolRTclOTQlQjIlRTQlQkIlOTF8Y3J0OjEwOjE1MTY1MjA4MDB8cmVmbmljazoxODolRTclOTQlQjIlRTQlQkIlOTF8dXNlcmlkOjQ0Om85dDJsdUc5SjAzdTJZSHNYV19hWlZkekpCS2NAd2VpeGluLnNvaHUuY29tfA; pprdig=DofoMf0wbZEZWpW6skQ705ZIfxvWMrnddUrKVR7XSR4ptWSnpVzod5mwpypQ8ofutJ4OXDEsSI3Oh4Ilp-NLujN5chdDIv4eXJWLTXNti-esjcNk3r3MX_b4Wc4IBFnwHlI9XgnhFiQAnXLypHCwGGt-zktWXQohpniYje98lKg; sgid=13-32333937-AVpkRWBBaPjyUnqv9Vo65co; ppmdig=15165208000000005b17d1b42bb80a9661b172a7028e4868',
+    'Cookie': 'SUV=00BC555A72DDB1345A115E787464E355; SUID=28BFDD722313940A000000005A365C69; usid=DTANBAfUu85LGdi9; IPLOC=CN3201; ABTEST=0|1516520682|v1; weixinIndexVisited=1; sct=1; ppinf=5|1516520800|1517730400|dHJ1c3Q6MToxfGNsaWVudGlkOjQ6MjAxN3x1bmlxbmFtZToxODolRTclOTQlQjIlRTQlQkIlOTF8Y3J0OjEwOjE1MTY1MjA4MDB8cmVmbmljazoxODolRTclOTQlQjIlRTQlQkIlOTF8dXNlcmlkOjQ0Om85dDJsdUc5SjAzdTJZSHNYV19hWlZkekpCS2NAd2VpeGluLnNvaHUuY29tfA; pprdig=DofoMf0wbZEZWpW6skQ705ZIfxvWMrnddUrKVR7XSR4ptWSnpVzod5mwpypQ8ofutJ4OXDEsSI3Oh4Ilp-NLujN5chdDIv4eXJWLTXNti-esjcNk3r3MX_b4Wc4IBFnwHlI9XgnhFiQAnXLypHCwGGt-zktWXQohpniYje98lKg; sgid=13-32333937-AVpkRWBBaPjyUnqv9Vo65co; SUIR=D3A8CA64171275536A549C2917886DF4; SNUID=30492887F5F396BC1ECFB9A4F65744EB; ppmdig=151671873900000029126427ccd39a0fa5762557eeee7f9c; JSESSIONID=aaasIZBSvnTahfceQ_Bew',
     'Host': 'weixin.sogou.com',
     'Referer': 'http://weixin.sogou.com/weixin?query=%E9%A3%8E%E6%99%AF&type=2&page=100',
     'Upgrade': 'Insecure-Requests:1',
@@ -15,15 +21,11 @@ headers = {
     'Keep-Alive': 'timeout=1'
 }
 
-keyword = '风景'
-proxy_pool_url = 'http://127.0.0.1:5556/random'
 proxy = None
-max_count = 1
-
 
 def get_proxy():
     try:
-        response = requests.get(proxy_pool_url)
+        response = requests.get(PROXY_POOL_URL)
         if response.status_code == 200:
             return response.text
         return None
@@ -84,7 +86,7 @@ def get_index(keyword, page):
     queries = urlencode(data)
     url = base_url + queries
     html = get_html(url)
-    print(html)
+    # print(html)
     return html
 
 def parse_index(html):
@@ -103,33 +105,50 @@ def get_detail(url):
         return None
 
 def parse_detail(html):
-    doc = pq(html)
-    title = doc('.rich_media_title').text()
-    content = doc('.rich_media_content').text()
-    date = doc('#post-date').text()
-    nickname = doc('.profile_nickname').text()
-    wechat = doc('#js_profile_qrcode > div > p:nth-child(3) > span').text()
-    print('title ' + title)
-    print('date ' + date)
-    print('content ' + content)
-    print('nickname ' + nickname)
-    print('wechat ' + wechat)
+    try:
+        doc = pq(html)
+        title = doc('.rich_media_title').text()
+        content = doc('.rich_media_content').text()
+        date = doc('#post-date').text()
+        nickname = doc('.profile_nickname').text()
+        wechat = doc('#js_profile_qrcode > div > p:nth-child(3) > span').text()
+        return {
+            'title': title,
+            'content': content,
+            'date': date,
+            'nickname': nickname,
+            'wechat': wechat
+        }
+    except XMLSyntaxError:
+        return None
+
+def save_to_mongo(data):
+    print(type(data))
+    db['articles']
+
+
+    if db['articles'].update({'title': data['title']}, {'$set': data}, True):
+        print('Saved to Mongo', data['title'])
+    else:
+        print('Saved to Mongo Failed', data['title'])
 
 def main():
     global proxy
     proxy = get_proxy()
     requests.adapters.DEFAULT_RETRIES = 50
-    # for page in range(1, 101):
-    #     get_index(keyword, page)
-    html = get_index(keyword, 1)
-    if html:
-        article_urls = parse_index(html)
-        for article_url in article_urls:
-            print(article_url)
-            detail = get_detail(article_url)
-            if detail:
-                parse_detail(detail)
-            print('-----------------')
+    for page in range(1, 101):
+        html = get_index(KEYWORD, page)
+        if html:
+            article_urls = parse_index(html)
+            for article_url in article_urls:
+                print(article_url)
+                detail = get_detail(article_url)
+                if detail:
+                    article_data = parse_detail(detail)
+                    print(article_data)
+                    if article_data:
+                        save_to_mongo(article_data)
+                print('-----------------')
 
 
 if __name__ == '__main__':
